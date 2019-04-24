@@ -19,6 +19,43 @@ Sublert is a security and reconnaissance tool that was written in Python to leve
 Please refer to below article for a detailed technical explanation:
 - https://medium.com/@yassineaboukir/automated-monitoring-of-subdomains-for-fun-and-profit-release-of-sublert-634cfc5d7708
 
+## Database Configuration (Postgresql)
+
+Install Postgresql database (Debian based systems)
+
+```
+    $ sudo apt-get install postgresql
+```
+
+Create the database user for sublert
+
+```
+    $ sudo -u postgres createuser <username>
+```
+
+Create database for sublert
+
+```
+    $ sudo -u postgres createdb <dbname>
+```
+
+Setup a password for the database user
+
+```
+    $ sudo -u postgres psql
+    psql=# alter user <username> with encrypted password '<password>';
+```
+
+Grant permissions to the database for the user
+
+```
+    $ sudo -u postgres psql
+    psql=# grant all privileges on database <dbname> to <username> ;
+```
+
+Finally update the config.py file to reflect the credentials created above
+
+
 ## Usage
 
 Short Form    | Long Form     | Description
@@ -33,7 +70,7 @@ Short Form    | Long Form     | Description
 
 ## Is there a roadmap?
 YES! The tool is now open sourced to be used by the community but contributions are valuable and highly appreciated. I have a number of items that I will be working on to polish the tool, among of which are:
-- Use of a relational database instead of text files for storage.
+- ~~Use of a relational database instead of text files for storage.~~ (Done)
 - Extracting as much information as possible including: title, status code, screenshot and checking for potential subdomain takeovers.
 - Integrate Telegram too for notification pushes.
 

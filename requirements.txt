@@ -3,3 +3,4 @@ tld
 requests
 dnspython
 psycopg2-binary
+sqlalchemy

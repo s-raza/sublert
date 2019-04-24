@@ -11,3 +11,10 @@ DB_HOST = 'crt.sh'
 DB_NAME = 'certwatch'
 DB_USER = 'guest'
 DB_PASSWORD = ''
+
+# sublert postgresql database credentials
+SLDB_CONFIG = {'uname': 'sublert',
+       'pass': 'sublertpass',
+       'host': 'localhost',
+       'name': 'sublertdb',
+       'port': '5432'}

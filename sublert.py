@@ -24,8 +24,14 @@ else:
 from config import *
 import time
 
+from db.SLDB import *
+
+
+
 version = "1.4.7"
 requests.packages.urllib3.disable_warnings()
+
+
 
 def banner():
     print('''
@@ -105,7 +111,7 @@ def slack(data): #posting to Slack
 
 def reset(do_reset): #clear the monitored list of domains and remove all locally stored files
     if do_reset:
-        os.system("cd ./output/ && rm -f *.txt && cd .. && rm -f domains.txt && touch domains.txt")
+        sldb.delete_all_domains()
         print(colored("\n[!] Sublert was reset successfully. Please add new domains to monitor!", "red"))
         sys.exit(1)
     else: pass
@@ -113,27 +119,27 @@ def reset(do_reset): #clear the monitored list of domains and remove all locally
 def remove_domain(domain_to_delete): #remove a domain from the monitored list
     new_list = []
     if domain_to_delete:
-        with open("domains.txt", "r") as domains:
-            for line in domains:
-                line = line.replace("\n", "")
-                if line in domain_to_delete:
-                    os.system("rm -f ./output/{}.txt".format(line))
-                    print(colored("\n[-] {} was successfully removed from the monitored list.".format(line), "green"))
-                else:
-                    new_list.append(line)
-        os.system("rm -f domains.txt")
-        with open("domains.txt", "w") as new_file:
-            for i in new_list:
-                new_file.write(i + "\n")
+                
+        if sldb.domain_exists(domain_to_delete):
+            sldb.delete_domain(domain_to_delete)
+            print(colored("\n[-] {} was successfully removed from the monitored list.".format(domain_to_delete), "green"))
+        else:
+            print(colored("\n[!] {} - Not found".format(domain_to_delete), "red"))
+                
         sys.exit(1)
 
 def domains_listing(): #list all the monitored domains
     global list_domains
     if list_domains:
-        print(colored("\n[*] Below is the list of monitored domain names:\n", "green"))
-        with open("domains.txt", "r") as monitored_list:
-            for domain in monitored_list:
+
+        domains = sldb.get_all_domains()
+        
+        if len(domains) > 0 :
+            print(colored("\n[*] Below is the list of monitored domain names:\n", "green"))
+            for domain in domains:
                 print(colored("{}".format(domain.replace("\n", "")), "yellow"))
+        else:
+            print(colored("\n[!] The domain monitoring list is currently empty\n", "red"))
         sys.exit(1)
 
 def errorlog(error, enable_logging): #log errors and post them to slack channel
@@ -200,60 +206,65 @@ def queuing(): #using the queue for multithreading purposes
     q2 = queue.Queue(maxsize=0)
     if domain_to_monitor:
         pass
-    elif os.path.getsize("domains.txt") == 0:
+    elif len(sldb.get_all_domains()) == 0:
         print(colored("[!] Please consider adding a list of domains to monitor first.", "red"))
         sys.exit(1)
     else:
-        with open("domains.txt", "r") as targets:
-            for line in targets:
-                if line != "":
-                    q1.put(line.replace('\n', ''))
-                    q2.put(line.replace('\n', ''))
-                else: pass
+                
+        for line in sldb.get_all_domains():
+            if line != "":
+                q1.put(line.replace('\n', ''))
+                q2.put(line.replace('\n', ''))
+            else:
+                pass
+                
 
 def adding_new_domain(q1): #adds a new domain to the monitoring list
     unique_list = []
     global domain_to_monitor
     global input
     if domain_to_monitor:
-        if not os.path.isfile('./domains.txt'): #check if domains.txt exist, if not create a new one
-            os.system("touch domains.txt")
-        else: pass
-        with open("domains.txt", "r+") as domains: #checking domain name isn't already monitored
-            for line in domains:
-                if domain_to_monitor == line.replace('\n', ''):
-                    print(colored("[!] The domain name {} is already being monitored.".format(domain_to_monitor), "red"))
-                    sys.exit(1)
-            response = cert_database().lookup(domain_to_monitor)
-            with open("./output/" + domain_to_monitor.lower() + ".txt", "a") as subdomains: #saving a copy of current subdomains
-                for subdomain in response:
-                    subdomains.write(subdomain + "\n")
-            with open("domains.txt", "a") as domains: #fetching subdomains if not monitored
-                domains.write(domain_to_monitor.lower() + '\n')
-                print(colored("\n[+] Adding {} to the monitored list of domains.\n".format(domain_to_monitor), "yellow"))
+                
+        if sldb.domain_exists(domain_to_monitor):
+            print(colored("[!] The domain name {} is already being monitored.".format(domain_to_monitor), "red"))
+            sys.exit(1)
+            
+        
+        sldb.add_domain(domain_to_monitor) # Adding new domain for monitoring.
+        
+        response = cert_database().lookup(domain_to_monitor)
+        
+        print(colored("\n[+] Adding {} to the monitored list of domains.\n".format(domain_to_monitor), "yellow"))
+        
+        if response:
+        
+            sldb.insert_subdomains(domain_name=domain_to_monitor, subdomains=response) #saving a copy of current subdomains retreived for the new domain.
+            
             try: input = raw_input #fixes python 2.x and 3.x input keyword
             except NameError: pass
+            
             choice = input(colored("[?] Do you wish to list subdomains found for {}? [Y]es [N]o (default: [N]) ".format(domain_to_monitor), "yellow")) #listing subdomains upon request
             if choice.upper() == "Y":
-                if response:
-                    for subdomain in response:
-                        unique_list.append(subdomain)
-                    unique_list = list(set(unique_list))
-                    for subdomain in unique_list:
-                        print(colored(subdomain, "yellow"))
-                else:
-                    print(colored("\n[!] Unfortunately, we couldn't find any subdomain for {}".format(domain_to_monitor), "red"))
+                for subdomain in response:
+                    unique_list.append(subdomain)
+                unique_list = list(set(unique_list))
+                for subdomain in unique_list:
+                    print(colored(subdomain, "yellow"))
             else:
-                sys.exit(1)
+                sys.exit(1)    
+        else:
+            print(colored("\n[!] Unfortunately, we couldn't find any subdomain for {}".format(domain_to_monitor), "red"))
+          
     else: #checks if a domain is monitored but has no text file saved in ./output
                 try:
                     line = q1.get(timeout=10)
-                    if not os.path.isfile("./output/" + line.lower() + ".txt"):
+                    if not sldb.domain_exists(line):
                         response = cert_database().lookup(line)
+                                    
                         if response:
-                            with open("./output/" + line.lower() + ".txt", "a") as subdomains:
-                                for subdomain in response:
-                                    subdomains.write(subdomain + "\n")
+                            sldb.insert_subdomains(domain_name=line, subdomains=response)
+                            
+                                    
                         else: pass
                     else: pass
                 except queue.Empty:
@@ -281,26 +292,19 @@ def compare_files_diff(domain_to_monitor): #compares the temporary text file wit
     if domain_to_monitor is None:
         if domain_to_delete is None:
             result = []
-            with open("domains.txt", "r") as targets:
-                for line in targets:
-                    domain_to_monitor = line.replace('\n', '')
-                    try:
-                        file1 = open("./output/" + domain_to_monitor.lower() + '.txt', 'r')
-                        file2 = open("./output/" + domain_to_monitor.lower() + '_tmp.txt', 'r')
-                        diff = difflib.ndiff(file1.readlines(), file2.readlines())
-                        changes = [l for l in diff if l.startswith('+ ')] #check if there are new items/subdomains
-                        newdiff = []
-                        for c in changes:
-                            c = c.replace('+ ', '')
-                            c = c.replace('*.', '')
-                            c = c.replace('\n', '')
-                            result.append(c)
-                            result = list(set(result)) #remove duplicates
-                    except:
-                        error = "There was an error opening one of the files: {} or {}".format(domain_to_monitor + '.txt', domain_to_monitor + '_tmp.txt')
-                        errorlog(error, enable_logging)
-                        os.system("rm -f ./output/{}".format(line.replace('\n','') + "_tmp.txt"))
-                return(result)
+                
+            for domain in sldb.get_all_domains():
+            
+                subdomains_lookup = cert_database().lookup(domain)
+            
+                all_subdomains = sldb.get_all_subdomains(domain)
+
+                new_subdomains = list(set(subdomains_lookup) - set(all_subdomains))
+                
+                [result.append(i) for i in new_subdomains]
+            
+            
+            return(result)
 
 def dns_resolution(new_subdomains): #Perform DNS resolution on retrieved subdomains
     dns_results = {}
@@ -349,10 +353,6 @@ def posting_to_slack(result, dns_resolve, dns_output): #sending result to slack 
             dns_result = {k:v for k,v in dns_result.items() if v} #filters non-resolving subdomains
             rev_url = []
             print(colored("\n[!] Exporting result to Slack. Please do not interrupt!", "red"))
-            for url in dns_result:
-                url = url.replace('*.', '')
-                url = url.replace('+ ', '')
-                rev_url.append(get_fld(url, fix_protocol = True))
 
             unique_list = list(set(new_subdomains) & set(dns_result.keys())) #filters non-resolving subdomains from new_subdomains list
 
@@ -371,50 +371,46 @@ def posting_to_slack(result, dns_resolve, dns_output): #sending result to slack 
                             data = "```CNAME : {}```".format(i)
                             slack(data)
                 except: pass
+                
             print(colored("\n[!] Done. ", "green"))
-            rev_url = list(set(rev_url))
-            for url in rev_url:
-                os.system("rm -f ./output/" + url.lower() + ".txt")
-                os.system("mv -f ./output/" + url.lower() + "_tmp.txt " + "./output/" + url.lower() + ".txt") #save the temporary one
-            os.system("rm -f ./output/*_tmp.txt") #remove the remaining tmp files
+            
+            for subdomain in unique_list:
+                
+                sldb.insert_subdomains(get_fld(subdomain, fix_protocol = True), subdomain)
 
-    elif result:
+    elif len(result) > 0:
         rev_url = []
         print(colored("\n[!] Exporting the result to Slack. Please don't interrupt!", "red"))
         for url in result:
             url = "https://" + url.replace('+ ', '')
-            rev_url.append(get_fld(url))
             data = "{}:new: {}".format(at_channel(), url)
             slack(data)
         print(colored("\n[!] Done. ", "green"))
-        rev_url = list(set(rev_url))
-
-        for url in rev_url:
-            os.system("rm -f ./output/" + url.lower() + ".txt")
-            os.system("mv -f ./output/" + url.lower() + "_tmp.txt " + "./output/" + url.lower() + ".txt") #save the temporary one
-        os.system("rm -f ./output/*_tmp.txt") #remove the remaining tmp files
+        
+        for subdomain in result:
+                
+                sldb.insert_subdomains(get_fld(subdomain, fix_protocol = True), subdomain)
 
     else:
         if not domain_to_monitor:
             data = "{}:-1: We couldn't find any new valid subdomains.".format(at_channel())
             slack(data)
             print(colored("\n[!] Done. ", "green"))
-            os.system("rm -f ./output/*_tmp.txt")
         else: pass
 
 def multithreading(threads):
     global domain_to_monitor
     threads_list = []
     if not domain_to_monitor:
-        num = sum(1 for line in open("domains.txt")) #minimum threads executed equals the number of monitored domains
+        num = len(sldb.get_all_domains())
         for i in range(max(threads, num)):
             if not (q1.empty() and q2.empty()):
                 t1 = threading.Thread(target = adding_new_domain, args = (q1, ))
-                t2 = threading.Thread(target = check_new_subdomains, args = (q2, ))
+                #t2 = threading.Thread(target = check_new_subdomains, args = (q2, ))
                 t1.start()
-                t2.start()
+                #t2.start()
                 threads_list.append(t1)
-                threads_list.append(t2)
+                #threads_list.append(t2)
     else:
         adding_new_domain(domain_to_monitor)
 
@@ -422,6 +418,10 @@ def multithreading(threads):
         t.join()
 
 if __name__ == '__main__':
+    
+    
+#Setup connection to database
+    sldb = SLDB(db_uname=SLDB_CONFIG['uname'],db_pass=SLDB_CONFIG['pass'],db_host=SLDB_CONFIG['host'],db_name=SLDB_CONFIG['name'])
 
 #parse arguments
     dns_resolve = parse_args().resolve
@@ -442,8 +442,12 @@ if __name__ == '__main__':
 
 # Check if DNS resolution is checked
     if not domain_to_monitor:
-        if (dns_resolve and new_subdomains):
+        if (dns_resolve and len(new_subdomains) > 0):
             dns_resolution(new_subdomains)
         else:
             posting_to_slack(new_subdomains, False, None)
     else: pass
+
+#Tear down connection to database    
+    sldb.session.close()
+    sldb.session.remove()
