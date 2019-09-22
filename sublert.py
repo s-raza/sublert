@@ -380,11 +380,12 @@ def posting_to_slack(result, dns_resolve, dns_output): #sending result to slack 
 
     elif len(result) > 0:
         rev_url = []
+        data = ":new:{} New subdomains found!:new: {}\n\n".format(len(result), at_channel())
         print(colored("\n[!] Exporting the result to Slack. Please don't interrupt!", "red"))
         for url in result:
-            url = "https://" + url.replace('+ ', '')
-            data = "{}:new: {}".format(at_channel(), url)
-            slack(data)
+            url = "https://{}\n".format(url.replace('+ ', ''))
+            data += "{}".format(url)
+        slack(data)
         print(colored("\n[!] Done. ", "green"))
         
         for subdomain in result:
