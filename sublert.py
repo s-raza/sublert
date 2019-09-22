@@ -21,7 +21,7 @@ if is_py2:
     import Queue as queue
 else:
     import queue as queue
-from config import *
+import config as cfg
 import time
 
 from db.SLDB import *
@@ -96,7 +96,7 @@ def domain_sanity_check(domain): #Verify the domain name sanity
         pass
 
 def slack(data): #posting to Slack
-    webhook_url = posting_webhook
+    webhook_url = cfg.slack['posting_webhook']
     slack_data = {'text': data}
     response = requests.post(
                         webhook_url,
@@ -106,7 +106,7 @@ def slack(data): #posting to Slack
     if response.status_code != 200:
         error = "Request to slack returned an error {}, the response is:\n{}".format(response.status_code, response.text)
         errorlog(error, enable_logging)
-    if slack_sleep_enabled:
+    if cfg.slack['sleep_enabled']:
         time.sleep(1)
 
 def reset(do_reset): #clear the monitored list of domains and remove all locally stored files
@@ -145,7 +145,7 @@ def domains_listing(): #list all the monitored domains
 def errorlog(error, enable_logging): #log errors and post them to slack channel
     if enable_logging:
         print(colored("\n[!] We encountered a small issue, please check error logging slack channel.", "red"))
-        webhook_url = errorlogging_webhook
+        webhook_url = cfg.slack['errorlogging_webhook']
         slack_data = {'text': '```' + error + '```'}
         response = requests.post(
                             webhook_url,
@@ -164,7 +164,7 @@ class cert_database(object): #Connecting to crt.sh public API to retrieve subdom
             try: #connecting to crt.sh postgres database to retrieve subdomains.
                 unique_domains = set()
                 domain = domain.replace('%25.', '')
-                conn = psycopg2.connect("dbname={0} user={1} host={2}".format(DB_NAME, DB_USER, DB_HOST))
+                conn = psycopg2.connect("dbname={0} user={1} host={2}".format(cfg.crtsh['name'], cfg.crtsh['user'], cfg.crtsh['host']))
                 conn.autocommit = True
                 cursor = conn.cursor()
                 cursor.execute("SELECT ci.NAME_VALUE NAME_VALUE FROM certificate_identity ci WHERE ci.NAME_TYPE = 'dNSName' AND reverse(lower(ci.NAME_VALUE)) LIKE reverse(lower('%{}'));".format(domain))
@@ -342,7 +342,7 @@ def dns_resolution(new_subdomains): #Perform DNS resolution on retrieved subdoma
         return posting_to_slack(None, False, None) #Nothing found notification
 
 def at_channel(): #control slack @channel
-    return("<!channel> " if at_channel_enabled else "")
+    return("<!channel> " if cfg.slack['at_channel_enabled'] else "")
 
 def posting_to_slack(result, dns_resolve, dns_output): #sending result to slack workplace
     global domain_to_monitor
@@ -421,7 +421,10 @@ if __name__ == '__main__':
     
     
 #Setup connection to database
-    sldb = SLDB(db_uname=sldb_user,db_pass=sldb_pass,db_host=sldb_host,db_name=sldb_dbname)
+    sldb = SLDB(db_uname=cfg.sldb['uname'],
+                db_pass=cfg.sldb['password'],
+                db_host=cfg.sldb['host'],
+                db_name=cfg.sldb['dbname'])
 
 #parse arguments
     dns_resolve = parse_args().resolve
