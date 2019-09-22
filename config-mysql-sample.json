@@ -1,0 +1,24 @@
+{
+    "slack" : {
+            "posting_webhook":     "<posting_webhook from slack>",
+            "errorlogging_webhook": "<errorlogging_webhook from slack>",
+            "sleep_enabled": true,
+            "at_channel_enabled": true
+            },
+        
+    "crtsh" : {
+            "host" : "crt.sh",
+            "name" : "certwatch",
+            "user" : "guest",
+            "password": ""
+            },
+        
+    "sldb" : {
+            "dialect": "mysql+mysqldb",
+            "uname": "sublertusr",
+            "password": "sublertpass",
+            "host": "localhost",
+            "dbname": "sublertdb",
+            "port": null
+           }
+}

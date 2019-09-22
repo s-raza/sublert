@@ -421,10 +421,7 @@ if __name__ == '__main__':
     
     
 #Setup connection to database
-    sldb = SLDB(db_uname=cfg.sldb['uname'],
-                db_pass=cfg.sldb['password'],
-                db_host=cfg.sldb['host'],
-                db_name=cfg.sldb['dbname'])
+    sldb = SLDB(conn_string = cfg.sldb['conn_string'])
 
 #parse arguments
     dns_resolve = parse_args().resolve

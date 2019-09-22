@@ -55,6 +55,69 @@ Grant permissions to the database for the user
 
 Finally update the config.py file to reflect the credentials created above
 
+## JSON Configuration
+
+Place a JSON file 'config.json' one directory above the folder containing the sublert.py file, with the following .
+
+If dialect is set to null a local file named "sublert.db" will be created in the same folder from where sublert is being run, and sqlite database will be used.
+
+##### Postgresql Sample
+
+```
+{
+    "slack" : {
+            "posting_webhook":     "<posting_webhook from slack>",
+            "errorlogging_webhook": "<errorlogging_webhook from slack>",
+            "sleep_enabled": true,
+            "at_channel_enabled": true
+            },
+        
+    "crtsh" : {
+            "host" : "crt.sh",
+            "name" : "certwatch",
+            "user" : "guest",
+            "password": ""
+            },
+        
+    "sldb" : {
+            "dialect": "postgresql",
+            "uname": "sublertusr",
+            "password": "sublertpass",
+            "host": "localhost",
+            "dbname": "sublertdb",
+            "port": null
+           }
+}
+```
+
+##### MySQL Sample
+
+```
+{
+    "slack" : {
+            "posting_webhook":     "<posting_webhook from slack>",
+            "errorlogging_webhook": "<errorlogging_webhook from slack>",
+            "sleep_enabled": true,
+            "at_channel_enabled": true
+            },
+        
+    "crtsh" : {
+            "host" : "crt.sh",
+            "name" : "certwatch",
+            "user" : "guest",
+            "password": ""
+            },
+        
+    "sldb" : {
+            "dialect": "mysql+mysqldb",
+            "uname": "sublertusr",
+            "password": "sublertpass",
+            "host": "localhost",
+            "dbname": "sublertdb",
+            "port": null
+           }
+}
+```
 
 ## Usage
 
